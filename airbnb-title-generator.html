@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="el">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Γεννήτρια Τίτλων Καταλύματος – Airbnb/Booking</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <meta name="description" content="Φτιάξε τίτλους που φέρνουν κλικ για Airbnb/Booking: Είδος + Τοποθεσία + Δυνατό χαρακτηριστικό, λέξεις-κλειδιά, μετρητής χαρακτήρων και αντιγραφή.">
+  <link rel="preconnect" href="https://unpkg.com">
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    html, body { background: #f8fafc; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useMemo } = React;
+
+    const powerWords = ["φωτεινό","ήσυχο","μοντέρνο","ευρύχωρο","δροσερό","ζεστό","κομψό","minimal","οικογενειακό","business-ready"];
+    const features = ["ιδιωτική πισίνα","δωρεάν πάρκινγκ","βεράντα","κήπος","τζάκι","γρήγορο Wi‑Fi","air condition","πλυντήριο","κουζίνα","pet-friendly"];
+    const audiences = ["ζευγάρια","οικογένειες","επαγγελματίες","παρέες"];
+
+    function countChars(s){ return [...s].length; }
+    function smartTrim(text, max){
+      if(countChars(text) <= max) return text;
+      const parts = text.split(/\\s+/);
+      let out = "";
+      for(const p of parts){
+        const add = out ? out + " " + p : p;
+        if(countChars(add) <= max) out = add; else break;
+      }
+      return out || text.slice(0, max);
+    }
+
+    function ChipGroup({ list, selected, onToggle }){
+      return (
+        <div className="flex flex-wrap gap-2">
+          {list.map(item => (
+            <button
+              key={item}
+              onClick={() => onToggle(item)}
+              className={"rounded-2xl px-3 py-1 border text-sm transition shadow-sm " + (selected.includes(item) ? "bg-black text-white border-black" : "bg-white text-gray-800 border-gray-300 hover:border-black")}
+            >{item}</button>
+          ))}
+        </div>
+      );
+    }
+
+    function useTitleIdeas({ mode, type, area, landmark, distance, view, power, feats, audience }){
+      const targetMax = mode === "Airbnb" ? 50 : 70; // ενδεικτικοί στόχοι
+      const templates = [
+        "{type} στο {area} – {distance}{landmark}{view}{feature}",
+        "{power} {type} στο {area} – {near}{audience}{feature}",
+        "{type} με {feature} στο {area} – {distance}{landmark}",
+        "{type} {view} στο {area} – κοντά σε {landmark}",
+        "{power} {type} δίπλα στο {landmark} – ιδανικό για {audience}",
+        "{type} στο {area} – {near} • {feature}",
+        "{power} {type} στο {area} • {feature} • {near}",
+        "{type} στο {area} – {audience} • {feature}",
+        "{type} στο {area} – {view} • {feature}",
+        "{power} {type} – {distance}{landmark} • {feature}",
+      ];
+
+      function pick(arr){ return arr.length ? arr[Math.floor(Math.random()*arr.length)] : ""; }
+
+      const near = landmark ? `κοντά σε ${landmark}` : "";
+      const dist = distance ? `${distance} από ` : "";
+      const viewTxt = view ? `• θέα ${view}` : "";
+      const featureTxt = feats.length ? pick(feats) : pick(features);
+      const powerTxt = power.length ? pick(power) : pick(powerWords);
+      const audienceTxt = audience.length ? pick(audience) : pick(audiences);
+
+      function fmt(tpl){
+        return tpl
+          .replace("{type}", type || "Διαμέρισμα")
+          .replace("{area}", area || "Κέντρο")
+          .replace("{landmark}", landmark || "κέντρο")
+          .replace("{distance}", dist)
+          .replace("{view}", view ? `με θέα ${view}` : "")
+          .replace("{feature}", featureTxt)
+          .replace("{power}", powerTxt)
+          .replace("{near}", near)
+          .replace("{audience}", audienceTxt)
+          .replace(/\\s+/g, " ")
+          .replace(/\\s–\\s+/g, " – ")
+          .trim();
+      }
+
+      const ideas = templates.map(fmt).map(t => countChars(t) > targetMax ? smartTrim(t, targetMax) : t);
+      return { ideas, targetMax };
+    }
+
+    function CopyButton({ text }){
+      const [copied, setCopied] = useState(false);
+      return (
+        <button
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(text);
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1200);
+            } catch(e){}
+          }}
+          className="text-sm px-3 py-1 rounded-xl border border-gray-300 hover:border-black transition"
+          title="Αντιγραφή τίτλου"
+        >{copied ? "Αντιγράφηκε" : "Αντιγραφή"}</button>
+      );
+    }
+
+    function App(){
+      const [mode, setMode] = useState("Airbnb");
+      const [type, setType] = useState("Διαμέρισμα");
+      const [area, setArea] = useState("");
+      const [landmark, setLandmark] = useState("");
+      const [distance, setDistance] = useState("");
+      const [view, setView] = useState("");
+      const [powerSel, setPowerSel] = useState([]);
+      const [featSel, setFeatSel] = useState([]);
+      const [audSel, setAudSel] = useState([]);
+      const [customKeywords, setCustomKeywords] = useState("");
+
+      function toggle(setter, arr, item){
+        if(arr.includes(item)) setter(arr.filter(x => x !== item));
+        else setter([...arr, item]);
+      }
+
+      const { ideas, targetMax } = useTitleIdeas({
+        mode, type, area, landmark, distance, view,
+        power: powerSel,
+        feats: featSel.concat(
+          customKeywords.split(",").map(x => x.trim()).filter(Boolean)
+        ),
+        audience: audSel
+      });
+
+      const keywordSet = useMemo(() => {
+        const base = new Set([
+          type, area, landmark, view && `θέα ${view}`,
+          ...powerSel, ...featSel, ...audSel,
+          ...customKeywords.split(",").map(x => x.trim()).filter(Boolean)
+        ].filter(Boolean));
+        return [...base];
+      }, [type, area, landmark, view, powerSel, featSel, audSel, customKeywords]);
+
+      return (
+        <div className="min-h-screen bg-gray-50 text-gray-900 p-6">
+          <div className="max-w-5xl mx-auto grid gap-6">
+            <header className="flex flex-col gap-2">
+              <h1 className="text-2xl md:text-3xl font-bold">Γεννήτρια Τίτλων Καταλύματος</h1>
+              <p className="text-gray-600">Φτιάξε τίτλους που φέρνουν κλικ: <span className="font-medium">Είδος + Τοποθεσία + Δυνατό χαρακτηριστικό</span>. Πρόσθεσε λέξεις‑κλειδιά και πάρε 10 έτοιμες προτάσεις με μετρητή χαρακτήρων.</p>
+            </header>
+
+            <section className="grid md:grid-cols-3 gap-4">
+              <div className="bg-white rounded-2xl p-4 shadow-sm border">
+                <div className="flex items-center justify-between mb-3">
+                  <label className="font-semibold">Πλατφόρμα</label>
+                  <select value={mode} onChange={e => setMode(e.target.value)} className="border rounded-xl px-3 py-1">
+                    <option>Airbnb</option>
+                    <option>Booking</option>
+                  </select>
+                </div>
+
+                <div className="grid gap-3">
+                  <div>
+                    <label className="text-sm text-gray-600">Είδος</label>
+                    <input value={type} onChange={e => setType(e.target.value)} placeholder="Διαμέρισμα / Βίλα / Στούντιο" className="w-full border rounded-xl px-3 py-2" />
+                  </div>
+                  <div>
+                    <label className="text-sm text-gray-600">Περιοχή</label>
+                    <input value={area} onChange={e => setArea(e.target.value)} placeholder="Κουκάκι / Κέντρο / Παλαιό Φάληρο" className="w-full border rounded-xl px-3 py-2" />
+                  </div>
+                  <div>
+                    <label className="text-sm text-gray-600">Σημείο αναφοράς (προαιρετικό)</label>
+                    <input value={landmark} onChange={e => setLandmark(e.target.value)} placeholder="Ακρόπολη / μετρό / παραλία" className="w-full border rounded-xl px-3 py-2" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-sm text-gray-600">Απόσταση (π.χ. 5’ / 200μ)</label>
+                      <input value={distance} onChange={e => setDistance(e.target.value)} placeholder="5’ / 200μ" className="w-full border rounded-xl px-3 py-2" />
+                    </div>
+                    <div>
+                      <label className="text-sm text-gray-600">Θέα (προαιρετικό)</label>
+                      <input value={view} onChange={e => setView(e.target.value)} placeholder="Ακρόπολη / θάλασσα / πάρκο" className="w-full border rounded-xl px-3 py-2" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl p-4 shadow-sm border">
+                <h3 className="font-semibold mb-2">Λέξεις-κλειδιά (προτείνεται)</h3>
+                <p className="text-sm text-gray-600 mb-3">Διάλεξε 2–4 λέξεις που περιγράφουν την εμπειρία και τα δυνατά σημεία.</p>
+                <div className="mb-3">
+                  <label className="text-xs text-gray-500">Power words</label>
+                  <ChipGroup list={powerWords} selected={powerSel} onToggle={(x)=>toggle(setPowerSel, powerSel, x)} />
+                </div>
+                <div className="mb-3">
+                  <label className="text-xs text-gray-500">Χαρακτηριστικά</label>
+                  <ChipGroup list={features} selected={featSel} onToggle={(x)=>toggle(setFeatSel, featSel, x)} />
+                </div>
+                <div className="mb-3">
+                  <label className="text-xs text-gray-500">Κοινό-στόχος</label>
+                  <ChipGroup list={audiences} selected={audSel} onToggle={(x)=>toggle(setAudSel, audSel, x)} />
+                </div>
+                <div className="mb-1">
+                  <label className="text-xs text-gray-500">Custom keywords (προαιρετικό, χώρισε με κόμμα)</label>
+                  <input value={customKeywords} onChange={e => setCustomKeywords(e.target.value)} placeholder="μετρό, πάρκινγκ, pet-friendly" className="w-full border rounded-xl px-3 py-2" />
+                </div>
+                <div className="text-xs text-gray-500">Στόχευσε τίτλο κοντά σε <span className="font-medium">{mode === "Airbnb" ? "50" : "60–70"}</span> χαρακτήρες. (Ενδεικτικά όρια)</div>
+              </div>
+
+              <div className="bg-white rounded-2xl p-4 shadow-sm border">
+                <h3 className="font-semibold mb-2">Checklist ποιότητας</h3>
+                <ul className="text-sm list-disc ml-5 space-y-1">
+                  <li>Δείχνει <span className="font-medium">τι</span> είναι; (είδος)</li>
+                  <li>Λέει <span className="font-medium">πού</span> είναι; (περιοχή/POI)</li>
+                  <li>Δίνει <span className="font-medium">γιατί</span>; (ισχυρό χαρακτηριστικό/κοινό)</li>
+                  <li>Περιέχει 1–2 λέξεις‑κλειδιά;</li>
+                  <li>Καθαρός, χωρίς κεφαλαία/emoji;</li>
+                </ul>
+                <div className="mt-4 p-3 bg-gray-50 rounded-xl text-xs text-gray-600">
+                  Tip: Άλλαξε 1–2 λέξεις και ξαναδοκίμασε. Το CTR ανεβαίνει όταν ο τίτλος είναι στοχευμένος.
+                </div>
+              </div>
+            </section>
+
+            <section className="bg-white rounded-2xl p-4 shadow-sm border">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold">Προτάσεις τίτλων</h3>
+                <div className="text-sm text-gray-500">Στόχος χαρακτήρων: ~{targetMax}</div>
+              </div>
+              <div className="grid md:grid-cols-2 gap-3 mt-3">
+                {ideas.map((t, i) => (
+                  <div key={i} className="border rounded-2xl p-3 flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm md:text-base font-medium">{t}</div>
+                      <div className={"text-xs " + (countChars(t) > targetMax ? "text-rose-600" : "text-gray-500")}>
+                        {countChars(t)} χαρακτήρες {countChars(t) > targetMax ? "(σκέψου μικρότερη εκδοχή)" : ""}
+                      </div>
+                    </div>
+                    <CopyButton text={t} />
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="bg-white rounded-2xl p-4 shadow-sm border">
+              <h3 className="font-semibold mb-2">Λέξεις‑κλειδιά που χρησιμοποίησες</h3>
+              <div className="flex flex-wrap gap-2">
+                {keywordSet.length ? (
+                  keywordSet.map(k => <span key={k} className="text-xs px-2 py-1 border rounded-xl bg-gray-50">{k}</span>)
+                ) : (
+                  <span className="text-sm text-gray-500">Δεν έχουν προστεθεί λέξεις‑κλειδιά ακόμα.</span>
+                )}
+              </div>
+            </section>
+
+            <footer className="text-xs text-gray-500 text-center pb-6">
+              Όλα τρέχουν τοπικά στον browser σας. Δεν αποθηκεύονται δεδομένα σε server.
+            </footer>
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
